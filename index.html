@@ -207,6 +207,25 @@
       width: 100%;
     }
 
+    .tips {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--panel-soft);
+    }
+
+    .tips h2 {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+
+    .tips p + p {
+      margin-top: 12px;
+    }
+
     button {
       border: 0;
       border-radius: 999px;
@@ -423,6 +442,12 @@
       <audio id="audioPlayer" controls preload="metadata"></audio>
       <p id="fileStatus">미리 생성된 5분 WAV/PCM 파일을 선택한 시간만큼 이어붙여 재생합니다.</p>
     </div>
+
+    <section class="tips" aria-label="playback tips">
+      <h2>Tips</h2>
+      <p><strong>유선 헤드폰/스피커 권장:</strong> 블루투스 이어폰은 소리를 압축해서 전송하기 때문에 미세한 진폭 변조(AM) 파형이 뭉개질 수 있습니다. 가급적 유선 헤드폰이나, 저음부터 고음까지 출력이 고른 외부 스피커를 사용하는 것이 좋습니다.</p>
+      <p><strong>적절한 볼륨 설정:</strong> 볼륨을 너무 크게 하면 귀가 피로해져 부교감 신경이 오히려 긴장합니다. 대화하는 목소리보다 약간 작게, 배경음악처럼 은은하게 공간을 채우는 정도의 볼륨을 권장합니다.</p>
+    </section>
 
     <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 5분짜리 고음질 WAV/PCM 파일을 임시로 이어붙여 재생하며, 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
   </main>
