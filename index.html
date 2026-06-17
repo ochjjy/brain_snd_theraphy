@@ -258,7 +258,7 @@
         constructor() {
           super();
           this.configured = false;
-          this.ended = false;
+          this.hasSentEnded = false;
           this.frame = 0;
           this.carrierPhase = 0;
           this.modPhase = 0;
@@ -281,11 +281,11 @@
               this.carrierPhase = 0;
               this.modPhase = 0;
               this.configured = true;
-              this.ended = false;
+              this.hasSentEnded = false;
             }
 
             if (data.type === "stop") {
-              this.ended = true;
+              this.configured = false;
             }
           };
         }
@@ -293,8 +293,12 @@
         process(inputs, outputs) {
           const output = outputs[0];
 
-          if (!this.configured || this.ended) {
-            return !this.ended;
+          if (!this.configured) {
+            for (let channel = 0; channel < output.length; channel += 1) {
+              output[channel].fill(0);
+            }
+
+            return true;
           }
 
           for (let i = 0; i < output[0].length; i += 1) {
@@ -303,8 +307,9 @@
                 output[channel][i] = 0;
               }
 
-              if (!this.ended) {
-                this.ended = true;
+              if (!this.hasSentEnded) {
+                this.hasSentEnded = true;
+                this.configured = false;
                 this.port.postMessage({ type: "ended" });
               }
               continue;
@@ -362,7 +367,18 @@
 
     function getAudioContext() {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      return audioContext || new AudioContextClass();
+      if (!audioContext || audioContext.state === "closed") {
+        audioContext = new AudioContextClass();
+        workletReadyPromise = null;
+      }
+
+      return audioContext;
+    }
+
+    async function resumeAudioContext(context) {
+      if (context.state !== "running") {
+        await context.resume();
+      }
     }
 
     async function ensureAudioWorklet(context) {
@@ -477,6 +493,7 @@
       });
       const currentPlayback = {
         stop() {
+          workletNode.port.onmessage = null;
           workletNode.port.postMessage({ type: "stop" });
           workletNode.disconnect();
         },
@@ -504,9 +521,7 @@
 
       try {
         audioContext = getAudioContext();
-        if (audioContext.state === "suspended") {
-          await audioContext.resume();
-        }
+        await resumeAudioContext(audioContext);
 
         const settings = {
           carrierFreq: Number(controls.carrier.value),
@@ -516,6 +531,7 @@
           fadeTime: 0.03,
         };
         const currentPlayback = await createSampleAccuratePlayback(audioContext, settings, currentPlaybackId);
+        await resumeAudioContext(audioContext);
 
         if (playbackId !== currentPlaybackId) {
           currentPlayback.stop();
