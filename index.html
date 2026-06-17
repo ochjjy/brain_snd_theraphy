@@ -231,7 +231,7 @@
 
     let audioContext;
     let source;
-    let timeoutId;
+    let playbackId = 0;
 
     function updateLabels() {
       labels.carrier.textContent = `${controls.carrier.value} Hz`;
@@ -246,12 +246,18 @@
       playButton.textContent = isPlaying ? "다시 재생" : "재생";
     }
 
-    function stopSound() {
-      clearTimeout(timeoutId);
+    function getAudioContext() {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      return audioContext || new AudioContextClass();
+    }
+
+    function stopSound(updateStatus = true) {
+      playbackId += 1;
 
       if (source) {
         const currentSource = source;
         source = null;
+        currentSource.onended = null;
 
         try {
           currentSource.stop();
@@ -261,7 +267,9 @@
         currentSource.disconnect();
       }
 
-      setStatus(false);
+      if (updateStatus) {
+        setStatus(false);
+      }
     }
 
     function createAmBuffer(context, duration, carrierFreq, modFreq, volume) {
@@ -290,33 +298,44 @@
     }
 
     async function playSound() {
-      stopSound();
+      stopSound(false);
+      const currentPlaybackId = playbackId + 1;
+      playbackId = currentPlaybackId;
+      playButton.disabled = true;
 
-      audioContext = audioContext || new AudioContext();
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
-
-      const carrierFreq = Number(controls.carrier.value);
-      const modFreq = Number(controls.mod.value);
-      const volume = Number(controls.volume.value) / 100;
-      const duration = Number(controls.duration.value);
-
-      const currentSource = audioContext.createBufferSource();
-      currentSource.buffer = createAmBuffer(audioContext, duration, carrierFreq, modFreq, volume);
-      currentSource.connect(audioContext.destination);
-      currentSource.onended = () => {
-        if (source === currentSource) {
-          clearTimeout(timeoutId);
-          source = null;
-          setStatus(false);
+      try {
+        audioContext = getAudioContext();
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
         }
-      };
-      source = currentSource;
-      currentSource.start();
 
-      timeoutId = setTimeout(stopSound, duration * 1000 + 100);
-      setStatus(true);
+        const carrierFreq = Number(controls.carrier.value);
+        const modFreq = Number(controls.mod.value);
+        const volume = Number(controls.volume.value) / 100;
+        const duration = Number(controls.duration.value);
+
+        const currentSource = audioContext.createBufferSource();
+        currentSource.buffer = createAmBuffer(audioContext, duration, carrierFreq, modFreq, volume);
+        currentSource.connect(audioContext.destination);
+        currentSource.onended = () => {
+          currentSource.disconnect();
+
+          if (playbackId === currentPlaybackId && source === currentSource) {
+            source = null;
+            setStatus(false);
+          }
+        };
+
+        source = currentSource;
+        currentSource.start();
+        setStatus(true);
+      } catch (error) {
+        source = null;
+        setStatus(false);
+        console.error("Audio playback failed:", error);
+      } finally {
+        playButton.disabled = false;
+      }
     }
 
     Object.values(controls).forEach((control) => {
