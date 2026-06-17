@@ -86,6 +86,81 @@
       margin: 0 0 24px;
     }
 
+    .frequency-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .frequency-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .frequency-option {
+      width: 100%;
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      border: 2px solid #d8c800;
+      border-radius: 0;
+      padding: 9px 12px;
+      color: #ffffff;
+      background: #050505;
+      font-size: 2.1rem;
+      line-height: 1;
+      font-weight: 800;
+      text-align: left;
+    }
+
+    .frequency-option.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(15, 123, 108, 0.18);
+    }
+
+    .help-button {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      padding: 0;
+      color: #ffffff;
+      background: #050505;
+      border: 2px solid #d8c800;
+      font-size: 1.35rem;
+      line-height: 1;
+    }
+
+    button.help-button {
+      border-radius: 50%;
+      padding: 0;
+      min-width: 44px;
+    }
+
+    .tooltip {
+      position: absolute;
+      z-index: 2;
+      top: calc(100% + 8px);
+      right: 0;
+      width: min(340px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: var(--ink);
+      background: #ffffff;
+      box-shadow: 0 14px 35px rgba(24, 32, 28, 0.14);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .tooltip[hidden] {
+      display: none;
+    }
+
     label {
       display: grid;
       gap: 8px;
@@ -122,6 +197,16 @@
       flex-wrap: wrap;
       align-items: center;
       margin-top: 8px;
+    }
+
+    .player {
+      display: grid;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    audio {
+      width: 100%;
     }
 
     button {
@@ -192,19 +277,26 @@
     </header>
 
     <section class="controls" aria-label="audio controls">
-      <label>
-        베이스 음정 <span id="carrierValue" class="value">440 Hz</span>
-        <input id="carrier" type="range" min="120" max="880" step="1" value="440">
-      </label>
-
-      <label>
-        타깃 자극 <span id="modValue" class="value">감마 40 Hz</span>
-        <select id="mod">
-          <option value="40" data-label="감마 40 Hz" selected>감마 Gamma - 40Hz</option>
-          <option value="8" data-label="알파/세타 8 Hz">알파/세타 Alpha &amp; Theta - 8Hz</option>
-          <option value="2" data-label="델타 2 Hz">델타 Delta - 2Hz</option>
-        </select>
-      </label>
+      <div>
+        <label>주파수 선택 <span id="modValue" class="value">40Hz</span></label>
+        <div class="frequency-grid" role="radiogroup" aria-label="target frequency">
+          <div class="frequency-row">
+            <button class="frequency-option active" type="button" role="radio" aria-checked="true" data-target="gamma" data-label="40Hz">40Hz</button>
+            <button class="help-button" type="button" aria-expanded="false" aria-controls="tip-gamma" data-tooltip="gamma">?</button>
+            <div id="tip-gamma" class="tooltip" hidden>감마 대역 예시입니다. 440Hz 베이스 음에 40Hz 진폭 변조를 적용한 5분 WAV 파일을 사용합니다.</div>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="alphaTheta" data-label="8Hz">8Hz</button>
+            <button class="help-button" type="button" aria-expanded="false" aria-controls="tip-alpha-theta" data-tooltip="alphaTheta">?</button>
+            <div id="tip-alpha-theta" class="tooltip" hidden>알파/세타 대역 예시입니다. 440Hz 베이스 음에 8Hz 진폭 변조를 적용한 5분 WAV 파일을 사용합니다.</div>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="delta" data-label="2Hz">2Hz</button>
+            <button class="help-button" type="button" aria-expanded="false" aria-controls="tip-delta" data-tooltip="delta">?</button>
+            <div id="tip-delta" class="tooltip" hidden>델타 대역 예시입니다. 440Hz 베이스 음에 2Hz 진폭 변조를 적용한 5분 WAV 파일을 사용합니다.</div>
+          </div>
+        </div>
+      </div>
 
       <label>
         볼륨 <span id="volumeValue" class="value">20%</span>
@@ -226,19 +318,21 @@
       <button id="stop" type="button">정지</button>
     </div>
 
-    <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 브라우저에서 실시간 PCM 파형을 생성하며, 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
+    <div class="player">
+      <audio id="audioPlayer" controls preload="metadata"></audio>
+      <p id="fileStatus">미리 생성된 5분 WAV/PCM 파일을 선택한 시간만큼 반복 재생합니다.</p>
+    </div>
+
+    <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 5분짜리 고음질 WAV/PCM 파일을 반복 재생하며, 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
   </main>
 
   <script>
     const controls = {
-      carrier: document.querySelector("#carrier"),
-      mod: document.querySelector("#mod"),
       volume: document.querySelector("#volume"),
       duration: document.querySelector("#duration"),
     };
 
     const labels = {
-      carrier: document.querySelector("#carrierValue"),
       mod: document.querySelector("#modValue"),
       volume: document.querySelector("#volumeValue"),
       duration: document.querySelector("#durationValue"),
@@ -247,114 +341,34 @@
 
     const playButton = document.querySelector("#play");
     const stopButton = document.querySelector("#stop");
+    const audioPlayer = document.querySelector("#audioPlayer");
+    const fileStatus = document.querySelector("#fileStatus");
+    const frequencyOptions = Array.from(document.querySelectorAll(".frequency-option"));
+    const helpButtons = Array.from(document.querySelectorAll(".help-button"));
+    const tooltips = Array.from(document.querySelectorAll(".tooltip"));
 
-    let audioContext;
     let source;
     let playbackId = 0;
-    let workletReadyPromise;
+    let loopStopTimer;
+    let targetPlaybackSeconds = 0;
+    let completedLoopCount = 0;
+    let lastAudioTime = 0;
+    let selectedTarget = "gamma";
 
-    const amWorkletCode = `
-      class AmToneProcessor extends AudioWorkletProcessor {
-        constructor() {
-          super();
-          this.configured = false;
-          this.hasSentEnded = false;
-          this.frame = 0;
-          this.carrierPhase = 0;
-          this.modPhase = 0;
-          this.carrierStep = 0;
-          this.modStep = 0;
-          this.durationFrames = 0;
-          this.fadeFrames = 1;
-          this.volume = 0;
-
-          this.port.onmessage = (event) => {
-            const data = event.data;
-
-            if (data.type === "start") {
-              this.carrierStep = (2 * Math.PI * data.carrierFreq) / sampleRate;
-              this.modStep = (2 * Math.PI * data.modFreq) / sampleRate;
-              this.durationFrames = Math.max(1, Math.round(data.duration * sampleRate));
-              this.fadeFrames = Math.max(1, Math.round(data.fadeTime * sampleRate));
-              this.volume = Math.max(0, Math.min(1, data.volume));
-              this.frame = 0;
-              this.carrierPhase = 0;
-              this.modPhase = 0;
-              this.configured = true;
-              this.hasSentEnded = false;
-            }
-
-            if (data.type === "stop") {
-              this.configured = false;
-            }
-          };
-        }
-
-        process(inputs, outputs) {
-          const output = outputs[0];
-
-          if (!this.configured) {
-            for (let channel = 0; channel < output.length; channel += 1) {
-              output[channel].fill(0);
-            }
-
-            return true;
-          }
-
-          for (let i = 0; i < output[0].length; i += 1) {
-            if (this.frame >= this.durationFrames) {
-              for (let channel = 0; channel < output.length; channel += 1) {
-                output[channel][i] = 0;
-              }
-
-              if (!this.hasSentEnded) {
-                this.hasSentEnded = true;
-                this.configured = false;
-                this.port.postMessage({ type: "ended" });
-              }
-              continue;
-            }
-
-            const carrier = Math.sin(this.carrierPhase);
-            const envelope = 0.5 * (1 - Math.cos(this.modPhase));
-            const fadeIn = Math.min(1, this.frame / this.fadeFrames);
-            const fadeOut = Math.min(1, (this.durationFrames - this.frame) / this.fadeFrames);
-            const fade = Math.min(fadeIn, fadeOut);
-            const sample = carrier * envelope * this.volume * fade;
-
-            for (let channel = 0; channel < output.length; channel += 1) {
-              output[channel][i] = sample;
-            }
-
-            this.carrierPhase += this.carrierStep;
-            this.modPhase += this.modStep;
-
-            if (this.carrierPhase >= 2 * Math.PI) {
-              this.carrierPhase -= 2 * Math.PI;
-            }
-
-            if (this.modPhase >= 2 * Math.PI) {
-              this.modPhase -= 2 * Math.PI;
-            }
-
-            this.frame += 1;
-          }
-
-          return true;
-        }
-      }
-
-      registerProcessor("am-tone-processor", AmToneProcessor);
-    `;
+    const wavSegmentDuration = 300;
+    const audioFiles = {
+      gamma: "wave/gamma_40hz_5m.wav",
+      alphaTheta: "wave/alpha_theta_8hz_5m.wav",
+      delta: "wave/delta_2hz_5m.wav",
+    };
 
     function formatDuration(seconds) {
       return `${Math.round(seconds / 60)}분`;
     }
 
     function updateLabels() {
-      const selectedTarget = controls.mod.options[controls.mod.selectedIndex];
-      labels.carrier.textContent = `${controls.carrier.value} Hz`;
-      labels.mod.textContent = selectedTarget.dataset.label;
+      const activeOption = frequencyOptions.find((option) => option.dataset.target === selectedTarget);
+      labels.mod.textContent = activeOption.dataset.label;
       labels.volume.textContent = `${controls.volume.value}%`;
       labels.duration.textContent = formatDuration(Number(controls.duration.value));
     }
@@ -365,41 +379,8 @@
       playButton.textContent = isPlaying ? "다시 재생" : "재생";
     }
 
-    function getAudioContext() {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (!audioContext || audioContext.state === "closed") {
-        audioContext = new AudioContextClass();
-        workletReadyPromise = null;
-      }
-
-      return audioContext;
-    }
-
-    async function resumeAudioContext(context) {
-      if (context.state !== "running") {
-        await context.resume();
-      }
-    }
-
-    async function ensureAudioWorklet(context) {
-      if (!context.audioWorklet) {
-        return false;
-      }
-
-      if (!workletReadyPromise) {
-        const workletBlob = new Blob([amWorkletCode], { type: "application/javascript" });
-        const workletUrl = URL.createObjectURL(workletBlob);
-
-        workletReadyPromise = context.audioWorklet.addModule(workletUrl)
-          .then(() => true)
-          .catch((error) => {
-            console.warn("AudioWorklet unavailable, falling back to native nodes:", error);
-            return false;
-          })
-          .finally(() => URL.revokeObjectURL(workletUrl));
-      }
-
-      return workletReadyPromise;
+    function setFileStatus(message) {
+      fileStatus.textContent = message;
     }
 
     function stopSound(updateStatus = true) {
@@ -411,106 +392,56 @@
         currentPlayback.stop();
       }
 
+      clearTimeout(loopStopTimer);
+      loopStopTimer = null;
+      targetPlaybackSeconds = 0;
+      completedLoopCount = 0;
+      lastAudioTime = 0;
+
+      audioPlayer.pause();
+      audioPlayer.loop = false;
+      audioPlayer.removeAttribute("src");
+      audioPlayer.load();
+
       if (updateStatus) {
         setStatus(false);
+        setFileStatus("정지되었습니다. 다시 재생하면 선택한 WAV/PCM 파일을 재생합니다.");
       }
     }
 
-    function createNodePlayback(context, settings, currentPlaybackId) {
-      const now = context.currentTime;
-      const endTime = now + settings.duration;
-      const carrier = context.createOscillator();
-      const modulator = context.createOscillator();
-      const offset = context.createConstantSource();
-      const modulationDepth = context.createGain();
-      const carrierGain = context.createGain();
-      const masterGain = context.createGain();
-      const nodes = [carrier, modulator, offset, modulationDepth, carrierGain, masterGain];
-      const sourceNodes = [carrier, modulator, offset];
-      const currentPlayback = {
-        stop() {
-          carrier.onended = null;
-          sourceNodes.forEach((node) => {
-            try {
-              node.stop();
-            } catch (error) {
-              // Already stopped nodes throw in some browsers.
-            }
-          });
-          nodes.forEach((node) => node.disconnect());
-        },
-      };
-
-      carrier.type = "sine";
-      carrier.frequency.setValueAtTime(settings.carrierFreq, now);
-      modulator.type = "sine";
-      modulator.frequency.setValueAtTime(settings.modFreq, now);
-      offset.offset.setValueAtTime(settings.volume * 0.5, now);
-      modulationDepth.gain.setValueAtTime(settings.volume * 0.5, now);
-      carrierGain.gain.setValueAtTime(0, now);
-      masterGain.gain.setValueAtTime(0, now);
-      masterGain.gain.linearRampToValueAtTime(1, now + settings.fadeTime);
-      masterGain.gain.setValueAtTime(1, endTime - settings.fadeTime);
-      masterGain.gain.linearRampToValueAtTime(0, endTime);
-
-      modulator.connect(modulationDepth);
-      modulationDepth.connect(carrierGain.gain);
-      offset.connect(carrierGain.gain);
-      carrier.connect(carrierGain);
-      carrierGain.connect(masterGain);
-      masterGain.connect(context.destination);
-
-      carrier.onended = () => {
-        nodes.forEach((node) => node.disconnect());
-
-        if (playbackId === currentPlaybackId && source === currentPlayback) {
-          source = null;
-          setStatus(false);
-        }
-      };
-
-      carrier.start(now);
-      modulator.start(now);
-      offset.start(now);
-      carrier.stop(endTime);
-      modulator.stop(endTime);
-      offset.stop(endTime);
-
-      return currentPlayback;
+    function stopAtTargetDuration(message = "선택한 재생 시간이 완료되었습니다.") {
+      clearTimeout(loopStopTimer);
+      loopStopTimer = null;
+      source = null;
+      targetPlaybackSeconds = 0;
+      completedLoopCount = 0;
+      lastAudioTime = 0;
+      audioPlayer.pause();
+      audioPlayer.loop = false;
+      audioPlayer.currentTime = 0;
+      setStatus(false);
+      setFileStatus(message);
     }
 
-    async function createSampleAccuratePlayback(context, settings, currentPlaybackId) {
-      const canUseWorklet = await ensureAudioWorklet(context);
+    function getLoopedPlaybackTime() {
+      const currentTime = audioPlayer.currentTime || 0;
 
-      if (!canUseWorklet) {
-        return createNodePlayback(context, settings, currentPlaybackId);
+      if (currentTime + 1 < lastAudioTime) {
+        completedLoopCount += 1;
       }
 
-      const workletNode = new AudioWorkletNode(context, "am-tone-processor", {
-        numberOfInputs: 0,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-      });
-      const currentPlayback = {
-        stop() {
-          workletNode.port.onmessage = null;
-          workletNode.port.postMessage({ type: "stop" });
-          workletNode.disconnect();
-        },
-      };
+      lastAudioTime = currentTime;
+      return completedLoopCount * wavSegmentDuration + currentTime;
+    }
 
-      workletNode.port.onmessage = (event) => {
-        if (event.data.type === "ended" && playbackId === currentPlaybackId && source === currentPlayback) {
-          workletNode.disconnect();
-          source = null;
-          setStatus(false);
-        }
-      };
+    function enforceTargetDuration() {
+      if (!targetPlaybackSeconds) {
+        return;
+      }
 
-      workletNode.connect(context.destination);
-      workletNode.port.postMessage({ type: "start", ...settings });
-
-      return currentPlayback;
+      if (getLoopedPlaybackTime() >= targetPlaybackSeconds) {
+        stopAtTargetDuration();
+      }
     }
 
     async function playSound() {
@@ -520,39 +451,115 @@
       playButton.disabled = true;
 
       try {
-        audioContext = getAudioContext();
-        await resumeAudioContext(audioContext);
+        const selectedDuration = Number(controls.duration.value);
+        const durationMinutes = Math.round(selectedDuration / 60);
+        const segmentMinutes = Math.round(wavSegmentDuration / 60);
 
-        const settings = {
-          carrierFreq: Number(controls.carrier.value),
-          modFreq: Number(controls.mod.value),
-          volume: Number(controls.volume.value) / 100,
-          duration: Number(controls.duration.value),
-          fadeTime: 0.03,
+        audioPlayer.src = audioFiles[selectedTarget];
+        audioPlayer.loop = true;
+        audioPlayer.volume = Number(controls.volume.value) / 100;
+        audioPlayer.load();
+        targetPlaybackSeconds = selectedDuration;
+        completedLoopCount = 0;
+        lastAudioTime = 0;
+
+        source = {
+          stop() {
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+          },
         };
-        const currentPlayback = await createSampleAccuratePlayback(audioContext, settings, currentPlaybackId);
-        await resumeAudioContext(audioContext);
 
-        if (playbackId !== currentPlaybackId) {
-          currentPlayback.stop();
-          return;
+        try {
+          await audioPlayer.play();
+          if (!loopStopTimer) {
+            loopStopTimer = setTimeout(stopAtTargetDuration, selectedDuration * 1000);
+          }
+          setStatus(true);
+          setFileStatus(`${labels.mod.textContent} 파일을 ${durationMinutes}분 동안 재생합니다. ${segmentMinutes}분 WAV를 반복 사용합니다.`);
+        } catch (playError) {
+          setStatus(false);
+          setFileStatus("iPhone에서 자동 재생이 막히면 아래 오디오 플레이어의 재생 버튼을 직접 눌러주세요.");
         }
-
-        source = currentPlayback;
-        setStatus(true);
       } catch (error) {
         source = null;
         setStatus(false);
-        console.error("Audio playback failed:", error);
+        setFileStatus("WAV/PCM 파일 재생에 실패했습니다.");
+        console.error("Audio file playback failed:", error);
       } finally {
         playButton.disabled = false;
       }
     }
 
-    Object.values(controls).forEach((control) => {
-      const eventName = control.tagName === "SELECT" ? "change" : "input";
-      control.addEventListener(eventName, updateLabels);
+    audioPlayer.addEventListener("play", () => {
+      if (targetPlaybackSeconds && !loopStopTimer) {
+        loopStopTimer = setTimeout(stopAtTargetDuration, Math.max(0, targetPlaybackSeconds - getLoopedPlaybackTime()) * 1000);
+      }
+      setStatus(true);
+      setFileStatus("5분 WAV/PCM 파일을 반복 재생 중입니다. 화면 잠금 후에도 지속되는지 확인해보세요.");
     });
+
+    audioPlayer.addEventListener("pause", () => {
+      if (!audioPlayer.ended) {
+        setStatus(false);
+      }
+    });
+
+    audioPlayer.addEventListener("ended", () => {
+      source = null;
+      setStatus(false);
+      setFileStatus("재생이 완료되었습니다.");
+    });
+
+    audioPlayer.addEventListener("timeupdate", enforceTargetDuration);
+
+    frequencyOptions.forEach((option) => {
+      option.addEventListener("click", () => {
+        selectedTarget = option.dataset.target;
+        frequencyOptions.forEach((button) => {
+          const isActive = button === option;
+          button.classList.toggle("active", isActive);
+          button.setAttribute("aria-checked", String(isActive));
+        });
+        updateLabels();
+      });
+    });
+
+    helpButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const tooltip = document.querySelector(`#${button.getAttribute("aria-controls")}`);
+        const shouldOpen = tooltip.hidden;
+
+        tooltips.forEach((item) => {
+          item.hidden = true;
+        });
+        helpButtons.forEach((item) => {
+          item.setAttribute("aria-expanded", "false");
+        });
+
+        tooltip.hidden = !shouldOpen;
+        button.setAttribute("aria-expanded", String(shouldOpen));
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (event.target.closest(".frequency-row")) {
+        return;
+      }
+
+      tooltips.forEach((item) => {
+        item.hidden = true;
+      });
+      helpButtons.forEach((item) => {
+        item.setAttribute("aria-expanded", "false");
+      });
+    });
+
+    controls.volume.addEventListener("input", () => {
+      audioPlayer.volume = Number(controls.volume.value) / 100;
+      updateLabels();
+    });
+    controls.duration.addEventListener("change", updateLabels);
 
     playButton.addEventListener("click", playSound);
     stopButton.addEventListener("click", stopSound);

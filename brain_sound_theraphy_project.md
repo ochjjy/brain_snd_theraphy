@@ -53,14 +53,14 @@ envelope = 0.5 * (1 + sin(2 * pi * modFreq * t - pi / 2))
 
 현재 `index.html`은 다음 기능을 제공합니다.
 
-- 브라우저에서 AM 오디오 생성
-- 베이스 음정, 즉 캐리어 주파수 조절
-- 감마, 알파/세타, 델타 타깃 자극 선택
+- 미리 생성된 5분 WAV/PCM 파일 재생
+- 440Hz 캐리어 기반의 감마, 알파/세타, 델타 타깃 자극 선택
+- 각 주파수별 `?` 도움말 툴팁
 - 볼륨 조절
 - 재생 시간 선택: 15분, 20분, 30분
 - 재생 및 정지 버튼
 - 현재 재생 상태 표시
-- 시작/종료 시 짧은 페이드 적용으로 클릭 노이즈 완화
+- 5분 파일 반복 재생으로 선택한 재생 시간 구성
 
 ### 2.4 구현 가능성 조사 요약
 
@@ -81,10 +81,14 @@ Web Audio API의 `OscillatorNode`는 지정한 주파수의 사인파 같은 주
 
 ### 3.1 파일 구성
 
-현재 프로젝트는 단일 HTML 파일로 구성되어 있습니다.
+현재 프로젝트는 웹페이지, WAV 생성 스크립트, 미리 생성된 WAV 파일로 구성되어 있습니다.
 
 ```text
 index.html
+generate_wave_files.py
+wave/gamma_40hz_5m.wav
+wave/alpha_theta_8hz_5m.wav
+wave/delta_2hz_5m.wav
 ```
 
 외부 라이브러리나 빌드 도구가 필요하지 않습니다. HTML, CSS, JavaScript가 한 파일 안에 포함되어 있으므로 브라우저에서 바로 열 수 있습니다.
@@ -94,18 +98,14 @@ index.html
 HTML은 크게 세 부분으로 구성됩니다.
 
 - 헤더: 제목, 설명, 재생 상태 표시
-- 컨트롤 영역: 주파수, 볼륨 슬라이더와 재생 시간 선택 메뉴
+- 컨트롤 영역: 주파수 선택 버튼, `?` 툴팁, 볼륨 슬라이더, 재생 시간 선택 메뉴
 - 액션 영역: 재생/정지 버튼과 주의 문구
 
 주요 입력 컨트롤은 다음과 같습니다.
 
 ```html
-<input id="carrier" type="range" min="120" max="880" step="1" value="440">
-<select id="mod">
-  <option value="40" selected>감마 Gamma - 40Hz</option>
-  <option value="8">알파/세타 Alpha & Theta - 8Hz</option>
-  <option value="2">델타 Delta - 2Hz</option>
-</select>
+<button class="frequency-option" data-target="gamma">40Hz</button>
+<button class="help-button" aria-controls="tip-gamma">?</button>
 <input id="volume" type="range" min="0" max="70" step="1" value="20">
 <select id="duration">
   <option value="900" selected>15분</option>
@@ -128,7 +128,7 @@ CSS는 별도 프레임워크 없이 작성되었습니다. 화면 중앙에 단
 
 오디오 생성과 재생의 핵심 함수는 `playSound()`입니다.
 
-초기 구현은 `AudioBuffer`에 PCM 샘플을 미리 채우는 방식이었지만, 15분에서 30분 정도의 긴 재생 시간에는 메모리 사용량이 커질 수 있습니다. 현재 구현은 `AudioWorkletProcessor`에서 매 오디오 샘플마다 AM 수식을 직접 계산해 실시간 PCM 파형을 생성합니다. `AudioWorklet`을 지원하지 않는 브라우저에서는 `OscillatorNode`, `GainNode`, `ConstantSourceNode`를 연결한 방식으로 자동 대체합니다.
+초기 구현은 `AudioWorkletProcessor`에서 매 오디오 샘플마다 AM 수식을 직접 계산해 실시간 PCM 파형을 생성했습니다. 그러나 iPhone Safari에서 화면이 꺼질 때 Web Audio 처리가 중단될 수 있어, 현재 구현은 선택한 설정의 10분짜리 16-bit mono WAV/PCM 파일을 먼저 생성한 뒤 HTML `<audio>` 요소로 루프 재생합니다. 이 방식은 iOS가 일반 미디어 재생으로 다룰 가능성이 더 높아 화면 잠금 상태의 지속 재생에 유리합니다.
 
 ```js
 const carrier = Math.sin(carrierPhase);
@@ -141,18 +141,30 @@ const sample = carrier * envelope * volume * fade;
 `playSound()`는 다음 순서로 동작합니다.
 
 1. 기존 재생 중인 소리를 정지합니다.
-2. `AudioContext`를 생성하거나 재사용합니다.
-3. 사용자가 설정한 캐리어 주파수, 타깃 자극, 볼륨, 지속 시간을 읽습니다.
-4. `AudioWorkletProcessor`에 설정값을 전달합니다.
-5. 오디오 처리 스레드에서 샘플 단위로 캐리어, 엔벨로프, 페이드 값을 계산합니다.
-6. 재생이 끝나면 상태를 정지로 되돌립니다.
+2. 사용자가 설정한 캐리어 주파수, 타깃 자극, 볼륨, 지속 시간을 읽습니다.
+3. Web Worker에서 10분짜리 WAV/PCM 샘플을 생성합니다.
+4. 생성된 WAV Blob을 `<audio>` 요소의 `src`로 연결합니다.
+5. 브라우저의 네이티브 미디어 플레이어로 루프 재생합니다.
+6. 선택한 15분, 20분, 30분에 도달하면 상태를 정지로 되돌립니다.
+
+현재 WAV 샘플레이트는 44,100Hz로 설정했습니다. 10분 파일 기준 예상 크기는 약 50.5MiB입니다. 10분은 600초이므로 440Hz 캐리어와 40Hz, 8Hz, 2Hz 변조 주파수가 모두 정수 번 반복되어 루프 경계의 위상이 자연스럽게 맞습니다.
+
+GitHub Pages에 파일을 미리 올리는 경우에는 10분짜리 파일 3개를 두는 구성이 적합합니다.
+
+```text
+audio/gamma_40hz_10m.wav
+audio/alpha_theta_8hz_10m.wav
+audio/delta_2hz_10m.wav
+```
+
+이 경우 20분과 30분은 10분 파일을 각각 2회, 3회 반복 재생하면 됩니다. 15분은 두 번째 루프의 5분 지점에서 정지해야 하므로 브라우저 이벤트 또는 타이머에 의존합니다.
 
 ### 3.5 아날로그 파형에 가깝게 전달하기 위한 처리
 
 브라우저에서 완전한 아날로그 파형을 직접 출력할 수는 없습니다. 최종 출력은 운영체제 오디오 믹서와 DAC를 거쳐 아날로그 신호로 변환됩니다. 다만 이 프로젝트는 다음 방식으로 원래 의도한 연속 사인파에 가깝게 전달되도록 구현했습니다.
 
 - MP3 같은 손실 압축 음원을 사용하지 않습니다.
-- 긴 오디오 파일을 미리 만들지 않고 실시간 PCM 샘플을 생성합니다.
+- 화면 잠금 재생 안정성을 위해 10분짜리 WAV/PCM 파일을 생성하고 `<audio>` 요소로 루프 재생합니다.
 - 캐리어와 변조 엔벨로프를 모두 `Math.sin`/`Math.cos` 기반의 부드러운 사인 파형으로 계산합니다.
 - 40Hz, 8Hz, 2Hz는 순음 캐리어가 아니라 진폭 엔벨로프 주파수로 적용합니다.
 - 기본 캐리어는 사람이 듣기 쉬운 440Hz로 설정하고, 사용자가 120~880Hz 범위에서 조절할 수 있게 했습니다.
@@ -161,13 +173,7 @@ const sample = carrier * envelope * volume * fade;
 
 ### 3.6 브라우저 오디오 정책 대응
 
-대부분의 최신 브라우저는 사용자의 명시적 동작 없이 자동으로 소리를 재생하지 못하게 제한합니다. 따라서 이 프로젝트는 페이지 로드 시 자동 재생하지 않고, 사용자가 `재생` 버튼을 누른 뒤 `AudioContext`를 시작합니다.
-
-```js
-if (audioContext.state === "suspended") {
-  await audioContext.resume();
-}
-```
+대부분의 최신 브라우저는 사용자의 명시적 동작 없이 자동으로 소리를 재생하지 못하게 제한합니다. 따라서 이 프로젝트는 페이지 로드 시 자동 재생하지 않고, 사용자가 `재생` 버튼을 누른 뒤 WAV/PCM 파일을 생성하고 `<audio>` 요소에 연결합니다. iPhone Safari에서 비동기 파일 생성 후 자동 재생이 막히는 경우를 대비해, 페이지 안에 네이티브 오디오 컨트롤도 함께 표시합니다.
 
 ### 3.7 재생 상태 관리
 
