@@ -292,6 +292,36 @@
       background: #2a3038;
     }
 
+    .progress-shell {
+      position: relative;
+      width: 100%;
+      height: 28px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #282f37;
+      margin: 6px 0 12px;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--warn));
+      transition: width 160ms ease;
+    }
+
+    .progress-text {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      font-size: 0.86rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    }
+
     @media (max-width: 620px) {
       body {
         padding: 14px;
@@ -408,6 +438,17 @@
     </section>
   </div>
 
+  <div id="progressModal" class="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="progressModalTitle">
+      <h2 id="progressModalTitle">임시 파일 준비 중</h2>
+      <p id="progressMessage">WAV 파일을 준비하고 있습니다.</p>
+      <div class="progress-shell" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="progressBar" class="progress-bar"></div>
+        <div id="progressPercent" class="progress-text">0%</div>
+      </div>
+    </section>
+  </div>
+
   <script>
     const controls = {
       volume: document.querySelector("#volume"),
@@ -434,6 +475,11 @@
     const stopModalMessage = document.querySelector("#stopModalMessage");
     const confirmStop = document.querySelector("#confirmStop");
     const cancelStop = document.querySelector("#cancelStop");
+    const progressModal = document.querySelector("#progressModal");
+    const progressMessage = document.querySelector("#progressMessage");
+    const progressShell = document.querySelector(".progress-shell");
+    const progressBar = document.querySelector("#progressBar");
+    const progressPercent = document.querySelector("#progressPercent");
 
     let source;
     let playbackId = 0;
@@ -527,6 +573,29 @@
       fileStatus.textContent = message;
     }
 
+    function setProgress(percent, message) {
+      const rounded = Math.max(0, Math.min(100, Math.round(percent)));
+      progressModal.hidden = false;
+      progressMessage.textContent = message;
+      progressBar.style.width = `${rounded}%`;
+      progressPercent.textContent = `${rounded}%`;
+      progressShell.setAttribute("aria-valuenow", String(rounded));
+    }
+
+    function closeProgressModal() {
+      progressModal.hidden = true;
+      progressMessage.textContent = "WAV 파일을 준비하고 있습니다.";
+      progressBar.style.width = "0%";
+      progressPercent.textContent = "0%";
+      progressShell.setAttribute("aria-valuenow", "0");
+    }
+
+    function waitForPaint() {
+      return new Promise((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    }
+
     function stopSound(updateStatus = true) {
       playbackId += 1;
 
@@ -544,6 +613,8 @@
         URL.revokeObjectURL(temporaryAudioUrl);
         temporaryAudioUrl = null;
       }
+
+      closeProgressModal();
 
       if (updateStatus) {
         setStatus(false);
@@ -568,13 +639,45 @@
       const repeatCount = selectedDuration / 300;
       const estimatedMb = ((wavHeaderBytes + (segmentBytes - wavHeaderBytes) * repeatCount) / 1024 / 1024).toFixed(1);
       setFileStatus(`${repeatCount}개 5분 WAV 세그먼트를 이어붙이는 중입니다. 예상 크기 약 ${estimatedMb}MiB`);
+      setProgress(3, `5분 WAV 파일을 불러오는 중입니다. 예상 임시 크기 약 ${estimatedMb}MiB`);
 
       const response = await fetch(audioFiles[target]);
       if (!response.ok) {
         throw new Error(`Failed to load audio file: ${response.status}`);
       }
 
-      const segment = await response.arrayBuffer();
+      const contentLength = Number(response.headers.get("content-length")) || segmentBytes;
+      const reader = response.body?.getReader();
+      let segment;
+
+      if (reader) {
+        const chunks = [];
+        let received = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          chunks.push(value);
+          received += value.byteLength;
+          setProgress(3 + (received / contentLength) * 42, "5분 WAV 파일을 다운로드하는 중입니다.");
+        }
+
+        const bytes = new Uint8Array(received);
+        let offset = 0;
+        chunks.forEach((chunk) => {
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        });
+        segment = bytes.buffer;
+      } else {
+        segment = await response.arrayBuffer();
+        setProgress(45, "5분 WAV 파일 다운로드가 완료되었습니다.");
+      }
+
       if (playbackId !== currentPlaybackId) {
         return null;
       }
@@ -587,10 +690,13 @@
       const segmentData = new Uint8Array(segment, wavHeaderBytes);
       for (let i = 0; i < repeatCount; i += 1) {
         output.set(segmentData, wavHeaderBytes + i * segmentDataBytes);
+        setProgress(45 + ((i + 1) / repeatCount) * 45, `${i + 1}/${repeatCount} 세그먼트를 이어붙이는 중입니다.`);
+        await waitForPaint();
       }
 
       updateWavHeader(new DataView(output.buffer), totalDataBytes);
       const blob = new Blob([output], { type: "audio/wav" });
+      setProgress(100, "임시 WAV 파일 준비가 완료되었습니다.");
 
       return URL.createObjectURL(blob);
     }
@@ -613,6 +719,7 @@
           return;
         }
 
+        closeProgressModal();
         audioPlayer.src = temporaryAudioUrl;
         audioPlayer.volume = Number(controls.volume.value) / 100;
         audioPlayer.load();
@@ -633,6 +740,7 @@
           setFileStatus("iPhone에서 자동 재생이 막히면 아래 오디오 플레이어의 재생 버튼을 직접 눌러주세요.");
         }
       } catch (error) {
+        closeProgressModal();
         source = null;
         setStatus(false);
         setFileStatus("WAV/PCM 파일 재생에 실패했습니다.");
