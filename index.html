@@ -96,9 +96,7 @@
     }
 
     .frequency-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
+      display: block;
       align-items: center;
     }
 
@@ -159,27 +157,6 @@
       color: #06100d;
       background: linear-gradient(180deg, #65e6c8, #31be9c);
       box-shadow: 0 0 0 3px rgba(72, 214, 180, 0.18);
-    }
-
-    .help-button {
-      width: 44px;
-      height: 44px;
-      min-width: 44px;
-      display: inline-grid;
-      place-items: center;
-      border-radius: 50%;
-      padding: 0;
-      color: var(--ink);
-      background: #20262d;
-      border: 1px solid rgba(234, 219, 53, 0.72);
-      font-size: 1.35rem;
-      line-height: 1;
-    }
-
-    button.help-button {
-      border-radius: 50%;
-      padding: 0;
-      min-width: 44px;
     }
 
     label {
@@ -266,6 +243,55 @@
       font-size: 0.92rem;
     }
 
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.64);
+    }
+
+    .modal-backdrop[hidden] {
+      display: none;
+    }
+
+    .modal {
+      width: min(420px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
+    }
+
+    .modal h2 {
+      margin: 0 0 10px;
+      font-size: 1.25rem;
+      letter-spacing: 0;
+    }
+
+    .modal p {
+      margin: 0 0 18px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    #confirmStop {
+      color: #06100d;
+      background: var(--accent);
+    }
+
+    #cancelStop {
+      color: var(--ink);
+      background: #2a3038;
+    }
+
     @media (max-width: 620px) {
       body {
         padding: 14px;
@@ -292,6 +318,10 @@
 
       button {
         flex: 1 1 120px;
+      }
+
+      .modal-actions {
+        flex-direction: column;
       }
     }
   </style>
@@ -329,15 +359,12 @@
         <div class="frequency-grid" role="radiogroup" aria-label="target frequency">
           <div class="frequency-row">
             <button class="frequency-option active" type="button" role="radio" aria-checked="true" data-target="gamma" data-label="40Hz">40Hz</button>
-            <button class="help-button" type="button" aria-label="40Hz 설명 보기" data-tooltip="gamma">?</button>
           </div>
           <div class="frequency-row">
             <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="alphaTheta" data-label="8Hz">8Hz</button>
-            <button class="help-button" type="button" aria-label="8Hz 설명 보기" data-tooltip="alphaTheta">?</button>
           </div>
           <div class="frequency-row">
             <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="delta" data-label="2Hz">2Hz</button>
-            <button class="help-button" type="button" aria-label="2Hz 설명 보기" data-tooltip="delta">?</button>
           </div>
         </div>
       </div>
@@ -370,6 +397,17 @@
     <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 5분짜리 고음질 WAV/PCM 파일을 임시로 이어붙여 재생하며, 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
   </main>
 
+  <div id="stopModal" class="modal-backdrop" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="stopModalTitle">
+      <h2 id="stopModalTitle">재생을 중지하시겠습니까?</h2>
+      <p id="stopModalMessage">다른 주파수를 선택하려면 현재 재생과 임시 파일 세션을 정리해야 합니다.</p>
+      <div class="modal-actions">
+        <button id="cancelStop" type="button">아니오</button>
+        <button id="confirmStop" type="button">예</button>
+      </div>
+    </section>
+  </div>
+
   <script>
     const controls = {
       volume: document.querySelector("#volume"),
@@ -388,15 +426,19 @@
     const audioPlayer = document.querySelector("#audioPlayer");
     const fileStatus = document.querySelector("#fileStatus");
     const frequencyOptions = Array.from(document.querySelectorAll(".frequency-option"));
-    const helpButtons = Array.from(document.querySelectorAll(".help-button"));
     const infoTitle = document.querySelector("#infoTitle");
     const infoRange = document.querySelector("#infoRange");
     const infoMechanism = document.querySelector("#infoMechanism");
     const infoEffect = document.querySelector("#infoEffect");
+    const stopModal = document.querySelector("#stopModal");
+    const stopModalMessage = document.querySelector("#stopModalMessage");
+    const confirmStop = document.querySelector("#confirmStop");
+    const cancelStop = document.querySelector("#cancelStop");
 
     let source;
     let playbackId = 0;
     let selectedTarget = "gamma";
+    let pendingTarget;
     let temporaryAudioUrl;
 
     const wavHeaderBytes = 44;
@@ -445,6 +487,34 @@
       infoRange.textContent = info.range;
       infoMechanism.textContent = info.mechanism;
       infoEffect.textContent = info.effect;
+    }
+
+    function isPlaying() {
+      return !audioPlayer.paused && !audioPlayer.ended;
+    }
+
+    function selectTarget(target) {
+      selectedTarget = target;
+      frequencyOptions.forEach((button) => {
+        const isActive = button.dataset.target === target;
+        button.classList.toggle("active", isActive);
+        button.setAttribute("aria-checked", String(isActive));
+      });
+      showFrequencyInfo(target);
+      updateLabels();
+    }
+
+    function openStopModal(target) {
+      const nextLabel = frequencyOptions.find((option) => option.dataset.target === target).dataset.label;
+      pendingTarget = target;
+      stopModalMessage.textContent = `${nextLabel}로 변경하려면 현재 재생 중인 파일을 중지하고 임시 세션을 정리해야 합니다.`;
+      stopModal.hidden = false;
+      confirmStop.focus();
+    }
+
+    function closeStopModal() {
+      stopModal.hidden = true;
+      pendingTarget = undefined;
     }
 
     function setStatus(isPlaying) {
@@ -591,29 +661,44 @@
 
     frequencyOptions.forEach((option) => {
       option.addEventListener("click", () => {
-        selectedTarget = option.dataset.target;
-        frequencyOptions.forEach((button) => {
-          const isActive = button === option;
-          button.classList.toggle("active", isActive);
-          button.setAttribute("aria-checked", String(isActive));
-        });
-        showFrequencyInfo(selectedTarget);
-        updateLabels();
+        const nextTarget = option.dataset.target;
+
+        if (nextTarget === selectedTarget) {
+          return;
+        }
+
+        if (isPlaying()) {
+          openStopModal(nextTarget);
+          return;
+        }
+
+        selectTarget(nextTarget);
       });
     });
 
-    helpButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const target = button.dataset.tooltip;
-        selectedTarget = target;
-        frequencyOptions.forEach((option) => {
-          const isActive = option.dataset.target === target;
-          option.classList.toggle("active", isActive);
-          option.setAttribute("aria-checked", String(isActive));
-        });
-        showFrequencyInfo(target);
-        updateLabels();
-      });
+    confirmStop.addEventListener("click", () => {
+      const nextTarget = pendingTarget;
+      stopSound(true);
+      closeStopModal();
+
+      if (nextTarget) {
+        selectTarget(nextTarget);
+        setFileStatus("재생이 중지되었습니다. 새 주파수를 선택했습니다.");
+      }
+    });
+
+    cancelStop.addEventListener("click", closeStopModal);
+
+    stopModal.addEventListener("click", (event) => {
+      if (event.target === stopModal) {
+        closeStopModal();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !stopModal.hidden) {
+        closeStopModal();
+      }
     });
 
     controls.volume.addEventListener("input", () => {
@@ -624,7 +709,7 @@
 
     playButton.addEventListener("click", playSound);
     stopButton.addEventListener("click", stopSound);
-    showFrequencyInfo(selectedTarget);
+    selectTarget(selectedTarget);
     updateLabels();
   </script>
 </body>
