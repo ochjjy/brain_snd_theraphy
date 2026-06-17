@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>40Hz AM Audio</title>
+  <title>Brain Sound AM Audio</title>
   <style>
     :root {
       color-scheme: light;
@@ -100,9 +100,20 @@
       font-variant-numeric: tabular-nums;
     }
 
-    input[type="range"] {
+    input[type="range"],
+    select {
       width: 100%;
       accent-color: var(--accent);
+    }
+
+    select {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #ffffff;
+      font: inherit;
     }
 
     .actions {
@@ -174,21 +185,25 @@
   <main>
     <header>
       <div>
-        <h1>40Hz AM Audio</h1>
-        <p>가청 캐리어 톤의 진폭을 40Hz로 변조해 재생합니다.</p>
+        <h1>Brain Sound AM Audio</h1>
+        <p>가청 캐리어 톤의 진폭을 선택한 타깃 주파수로 변조해 재생합니다.</p>
       </div>
       <div id="status" class="status">정지</div>
     </header>
 
     <section class="controls" aria-label="audio controls">
       <label>
-        캐리어 주파수 <span id="carrierValue" class="value">440 Hz</span>
+        베이스 음정 <span id="carrierValue" class="value">440 Hz</span>
         <input id="carrier" type="range" min="120" max="880" step="1" value="440">
       </label>
 
       <label>
-        변조 주파수 <span id="modValue" class="value">40 Hz</span>
-        <input id="mod" type="range" min="1" max="80" step="1" value="40">
+        타깃 자극 <span id="modValue" class="value">감마 40 Hz</span>
+        <select id="mod">
+          <option value="40" data-label="감마 40 Hz" selected>감마 Gamma - 40Hz</option>
+          <option value="8" data-label="알파/세타 8 Hz">알파/세타 Alpha &amp; Theta - 8Hz</option>
+          <option value="2" data-label="델타 2 Hz">델타 Delta - 2Hz</option>
+        </select>
       </label>
 
       <label>
@@ -197,8 +212,12 @@
       </label>
 
       <label>
-        지속 시간 <span id="durationValue" class="value">10초</span>
-        <input id="duration" type="range" min="1" max="60" step="1" value="10">
+        지속 시간 <span id="durationValue" class="value">15분</span>
+        <select id="duration">
+          <option value="900" selected>15분</option>
+          <option value="1200">20분</option>
+          <option value="1800">30분</option>
+        </select>
       </label>
     </section>
 
@@ -207,7 +226,7 @@
       <button id="stop" type="button">정지</button>
     </div>
 
-    <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
+    <p class="note">의료적 진단이나 치료 목적의 도구가 아닙니다. 브라우저에서 실시간 PCM 파형을 생성하며, 처음에는 낮은 볼륨으로 짧게 확인하세요.</p>
   </main>
 
   <script>
@@ -232,12 +251,107 @@
     let audioContext;
     let source;
     let playbackId = 0;
+    let workletReadyPromise;
+
+    const amWorkletCode = `
+      class AmToneProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.configured = false;
+          this.ended = false;
+          this.frame = 0;
+          this.carrierPhase = 0;
+          this.modPhase = 0;
+          this.carrierStep = 0;
+          this.modStep = 0;
+          this.durationFrames = 0;
+          this.fadeFrames = 1;
+          this.volume = 0;
+
+          this.port.onmessage = (event) => {
+            const data = event.data;
+
+            if (data.type === "start") {
+              this.carrierStep = (2 * Math.PI * data.carrierFreq) / sampleRate;
+              this.modStep = (2 * Math.PI * data.modFreq) / sampleRate;
+              this.durationFrames = Math.max(1, Math.round(data.duration * sampleRate));
+              this.fadeFrames = Math.max(1, Math.round(data.fadeTime * sampleRate));
+              this.volume = Math.max(0, Math.min(1, data.volume));
+              this.frame = 0;
+              this.carrierPhase = 0;
+              this.modPhase = 0;
+              this.configured = true;
+              this.ended = false;
+            }
+
+            if (data.type === "stop") {
+              this.ended = true;
+            }
+          };
+        }
+
+        process(inputs, outputs) {
+          const output = outputs[0];
+
+          if (!this.configured || this.ended) {
+            return !this.ended;
+          }
+
+          for (let i = 0; i < output[0].length; i += 1) {
+            if (this.frame >= this.durationFrames) {
+              for (let channel = 0; channel < output.length; channel += 1) {
+                output[channel][i] = 0;
+              }
+
+              if (!this.ended) {
+                this.ended = true;
+                this.port.postMessage({ type: "ended" });
+              }
+              continue;
+            }
+
+            const carrier = Math.sin(this.carrierPhase);
+            const envelope = 0.5 * (1 - Math.cos(this.modPhase));
+            const fadeIn = Math.min(1, this.frame / this.fadeFrames);
+            const fadeOut = Math.min(1, (this.durationFrames - this.frame) / this.fadeFrames);
+            const fade = Math.min(fadeIn, fadeOut);
+            const sample = carrier * envelope * this.volume * fade;
+
+            for (let channel = 0; channel < output.length; channel += 1) {
+              output[channel][i] = sample;
+            }
+
+            this.carrierPhase += this.carrierStep;
+            this.modPhase += this.modStep;
+
+            if (this.carrierPhase >= 2 * Math.PI) {
+              this.carrierPhase -= 2 * Math.PI;
+            }
+
+            if (this.modPhase >= 2 * Math.PI) {
+              this.modPhase -= 2 * Math.PI;
+            }
+
+            this.frame += 1;
+          }
+
+          return true;
+        }
+      }
+
+      registerProcessor("am-tone-processor", AmToneProcessor);
+    `;
+
+    function formatDuration(seconds) {
+      return `${Math.round(seconds / 60)}분`;
+    }
 
     function updateLabels() {
+      const selectedTarget = controls.mod.options[controls.mod.selectedIndex];
       labels.carrier.textContent = `${controls.carrier.value} Hz`;
-      labels.mod.textContent = `${controls.mod.value} Hz`;
+      labels.mod.textContent = selectedTarget.dataset.label;
       labels.volume.textContent = `${controls.volume.value}%`;
-      labels.duration.textContent = `${controls.duration.value}초`;
+      labels.duration.textContent = formatDuration(Number(controls.duration.value));
     }
 
     function setStatus(isPlaying) {
@@ -251,20 +365,34 @@
       return audioContext || new AudioContextClass();
     }
 
+    async function ensureAudioWorklet(context) {
+      if (!context.audioWorklet) {
+        return false;
+      }
+
+      if (!workletReadyPromise) {
+        const workletBlob = new Blob([amWorkletCode], { type: "application/javascript" });
+        const workletUrl = URL.createObjectURL(workletBlob);
+
+        workletReadyPromise = context.audioWorklet.addModule(workletUrl)
+          .then(() => true)
+          .catch((error) => {
+            console.warn("AudioWorklet unavailable, falling back to native nodes:", error);
+            return false;
+          })
+          .finally(() => URL.revokeObjectURL(workletUrl));
+      }
+
+      return workletReadyPromise;
+    }
+
     function stopSound(updateStatus = true) {
       playbackId += 1;
 
       if (source) {
-        const currentSource = source;
+        const currentPlayback = source;
         source = null;
-        currentSource.onended = null;
-
-        try {
-          currentSource.stop();
-        } catch (error) {
-          // Already stopped sources throw in some browsers.
-        }
-        currentSource.disconnect();
+        currentPlayback.stop();
       }
 
       if (updateStatus) {
@@ -272,29 +400,100 @@
       }
     }
 
-    function createAmBuffer(context, duration, carrierFreq, modFreq, volume) {
-      const sampleRate = context.sampleRate;
-      const frameCount = Math.floor(sampleRate * duration);
-      const buffer = context.createBuffer(1, frameCount, sampleRate);
-      const samples = buffer.getChannelData(0);
-      const fadeFrames = Math.min(Math.floor(sampleRate * 0.02), Math.floor(frameCount / 2));
+    function createNodePlayback(context, settings, currentPlaybackId) {
+      const now = context.currentTime;
+      const endTime = now + settings.duration;
+      const carrier = context.createOscillator();
+      const modulator = context.createOscillator();
+      const offset = context.createConstantSource();
+      const modulationDepth = context.createGain();
+      const carrierGain = context.createGain();
+      const masterGain = context.createGain();
+      const nodes = [carrier, modulator, offset, modulationDepth, carrierGain, masterGain];
+      const sourceNodes = [carrier, modulator, offset];
+      const currentPlayback = {
+        stop() {
+          carrier.onended = null;
+          sourceNodes.forEach((node) => {
+            try {
+              node.stop();
+            } catch (error) {
+              // Already stopped nodes throw in some browsers.
+            }
+          });
+          nodes.forEach((node) => node.disconnect());
+        },
+      };
 
-      for (let i = 0; i < frameCount; i += 1) {
-        const t = i / sampleRate;
-        const carrier = Math.sin(2 * Math.PI * carrierFreq * t);
-        const envelope = 0.5 * (1 + Math.sin((2 * Math.PI * modFreq * t) - (Math.PI / 2)));
-        let fade = 1;
+      carrier.type = "sine";
+      carrier.frequency.setValueAtTime(settings.carrierFreq, now);
+      modulator.type = "sine";
+      modulator.frequency.setValueAtTime(settings.modFreq, now);
+      offset.offset.setValueAtTime(settings.volume * 0.5, now);
+      modulationDepth.gain.setValueAtTime(settings.volume * 0.5, now);
+      carrierGain.gain.setValueAtTime(0, now);
+      masterGain.gain.setValueAtTime(0, now);
+      masterGain.gain.linearRampToValueAtTime(1, now + settings.fadeTime);
+      masterGain.gain.setValueAtTime(1, endTime - settings.fadeTime);
+      masterGain.gain.linearRampToValueAtTime(0, endTime);
 
-        if (i < fadeFrames) {
-          fade = i / fadeFrames;
-        } else if (i > frameCount - fadeFrames) {
-          fade = (frameCount - i) / fadeFrames;
+      modulator.connect(modulationDepth);
+      modulationDepth.connect(carrierGain.gain);
+      offset.connect(carrierGain.gain);
+      carrier.connect(carrierGain);
+      carrierGain.connect(masterGain);
+      masterGain.connect(context.destination);
+
+      carrier.onended = () => {
+        nodes.forEach((node) => node.disconnect());
+
+        if (playbackId === currentPlaybackId && source === currentPlayback) {
+          source = null;
+          setStatus(false);
         }
+      };
 
-        samples[i] = carrier * envelope * volume * fade;
+      carrier.start(now);
+      modulator.start(now);
+      offset.start(now);
+      carrier.stop(endTime);
+      modulator.stop(endTime);
+      offset.stop(endTime);
+
+      return currentPlayback;
+    }
+
+    async function createSampleAccuratePlayback(context, settings, currentPlaybackId) {
+      const canUseWorklet = await ensureAudioWorklet(context);
+
+      if (!canUseWorklet) {
+        return createNodePlayback(context, settings, currentPlaybackId);
       }
 
-      return buffer;
+      const workletNode = new AudioWorkletNode(context, "am-tone-processor", {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+      });
+      const currentPlayback = {
+        stop() {
+          workletNode.port.postMessage({ type: "stop" });
+          workletNode.disconnect();
+        },
+      };
+
+      workletNode.port.onmessage = (event) => {
+        if (event.data.type === "ended" && playbackId === currentPlaybackId && source === currentPlayback) {
+          workletNode.disconnect();
+          source = null;
+          setStatus(false);
+        }
+      };
+
+      workletNode.connect(context.destination);
+      workletNode.port.postMessage({ type: "start", ...settings });
+
+      return currentPlayback;
     }
 
     async function playSound() {
@@ -309,25 +508,21 @@
           await audioContext.resume();
         }
 
-        const carrierFreq = Number(controls.carrier.value);
-        const modFreq = Number(controls.mod.value);
-        const volume = Number(controls.volume.value) / 100;
-        const duration = Number(controls.duration.value);
-
-        const currentSource = audioContext.createBufferSource();
-        currentSource.buffer = createAmBuffer(audioContext, duration, carrierFreq, modFreq, volume);
-        currentSource.connect(audioContext.destination);
-        currentSource.onended = () => {
-          currentSource.disconnect();
-
-          if (playbackId === currentPlaybackId && source === currentSource) {
-            source = null;
-            setStatus(false);
-          }
+        const settings = {
+          carrierFreq: Number(controls.carrier.value),
+          modFreq: Number(controls.mod.value),
+          volume: Number(controls.volume.value) / 100,
+          duration: Number(controls.duration.value),
+          fadeTime: 0.03,
         };
+        const currentPlayback = await createSampleAccuratePlayback(audioContext, settings, currentPlaybackId);
 
-        source = currentSource;
-        currentSource.start();
+        if (playbackId !== currentPlaybackId) {
+          currentPlayback.stop();
+          return;
+        }
+
+        source = currentPlayback;
         setStatus(true);
       } catch (error) {
         source = null;
@@ -339,7 +534,8 @@
     }
 
     Object.values(controls).forEach((control) => {
-      control.addEventListener("input", updateLabels);
+      const eventName = control.tagName === "SELECT" ? "change" : "input";
+      control.addEventListener(eventName, updateLabels);
     });
 
     playButton.addEventListener("click", playSound);
