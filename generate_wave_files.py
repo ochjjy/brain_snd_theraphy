@@ -42,6 +42,21 @@ TARGETS = (
 )
 
 
+def is_integer_cycle(freq: float) -> bool:
+    """Return whether a frequency completes whole cycles in one segment."""
+    cycles = freq * DURATION_SECONDS
+    return math.isclose(cycles, round(cycles), abs_tol=1e-9)
+
+
+def validate_target_alignment(filename: str, mod_freq: float, carrier_freq: float) -> None:
+    """Reject targets that would click or drift when 5-minute files are joined."""
+    if not is_integer_cycle(mod_freq):
+        raise ValueError(f"{filename}: {mod_freq:g}Hz modulation does not align")
+
+    if not is_integer_cycle(carrier_freq):
+        raise ValueError(f"{filename}: {carrier_freq:g}Hz carrier does not align")
+
+
 def generate_am_wav(path: Path, mod_freq: float, carrier_freq: float) -> None:
     """Generate a seamless-loop 16-bit mono PCM WAV file."""
     total_frames = SAMPLE_RATE * DURATION_SECONDS
@@ -86,6 +101,7 @@ def main() -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     for filename, mod_freq, carrier_freq in TARGETS:
+        validate_target_alignment(filename, mod_freq, carrier_freq)
         path = OUTPUT_DIR / filename
         print(
             f"Generating {path} "
