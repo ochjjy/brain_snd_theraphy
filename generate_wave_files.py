@@ -2,8 +2,9 @@
 """
 Generate 5-minute AM WAV files for browser playback.
 
-The generated files use a 440Hz audible carrier and a sine-shaped amplitude
-envelope at the target stimulation frequency.
+The generated files use a soft audible carrier and a sine-shaped amplitude
+envelope at the target stimulation frequency. The modulation depth stays below
+100% so the sound feels less buzzy while preserving the target rhythm.
 """
 
 from __future__ import annotations
@@ -16,8 +17,9 @@ from pathlib import Path
 
 SAMPLE_RATE = 44_100
 DURATION_SECONDS = 5 * 60
-CARRIER_FREQ = 440.0
-PEAK_AMPLITUDE = 0.70
+CARRIER_FREQ = 220.0
+MODULATION_DEPTH = 0.45
+PEAK_AMPLITUDE = 0.50
 BITS_PER_SAMPLE = 16
 CHANNELS = 1
 CHUNK_SECONDS = 1
@@ -53,7 +55,8 @@ def generate_am_wav(path: Path, mod_freq: float) -> None:
 
             for _ in range(frames_this_chunk):
                 carrier = math.sin(carrier_phase)
-                envelope = 0.5 * (1 - math.cos(mod_phase))
+                mod_shape = 0.5 * (1 - math.cos(mod_phase))
+                envelope = (1 - MODULATION_DEPTH) + (MODULATION_DEPTH * mod_shape)
                 sample = carrier * envelope * PEAK_AMPLITUDE
                 samples.append(round(sample * max_int16))
 
