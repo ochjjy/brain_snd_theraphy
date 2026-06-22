@@ -415,6 +415,24 @@
           <div class="frequency-row">
             <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="delta" data-label="2Hz">2Hz</button>
           </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="lowAlpha" data-label="9.5Hz">9.5Hz</button>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="smr" data-label="13.5Hz">13.5Hz</button>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="schumann" data-label="7.83Hz">7.83Hz</button>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="solfeggio396" data-label="396Hz">396Hz</button>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="natural432" data-label="432Hz">432Hz</button>
+          </div>
+          <div class="frequency-row">
+            <button class="frequency-option" type="button" role="radio" aria-checked="false" data-target="healing528" data-label="528Hz">528Hz</button>
+          </div>
         </div>
       </div>
 
@@ -518,6 +536,12 @@
       gamma: "wave/gamma_40hz_5m.wav",
       alphaTheta: "wave/alpha_theta_8hz_5m.wav",
       delta: "wave/delta_2hz_5m.wav",
+      lowAlpha: "wave/low_alpha_9_5hz_5m.wav",
+      smr: "wave/smr_13_5hz_5m.wav",
+      schumann: "wave/schumann_7_83hz_5m.wav",
+      solfeggio396: "wave/solfeggio_396hz_5m.wav",
+      natural432: "wave/natural_432hz_5m.wav",
+      healing528: "wave/healing_528hz_5m.wav",
     };
 
     const frequencyInfo = {
@@ -538,6 +562,42 @@
         range: "0.5~4Hz",
         mechanism: "깊은 서파 수면과 뇌 화학적 피로 물질 배출, 물리적 세포 회복 촉진과 관련해 연구됩니다.",
         effect: "수면 유지와 회복, 불면 성향 완화, 혈압 안정, 만성 통증 완화 목적의 이완 자극으로 다뤄집니다.",
+      },
+      lowAlpha: {
+        title: "9.5Hz 낮은 알파 Low Alpha",
+        range: "9~10Hz",
+        mechanism: "바이오피드백과 이완 훈련 문맥에서 과도한 각성을 낮추고 차분하지만 깨어 있는 상태와 관련해 다뤄집니다.",
+        effect: "극심한 불안감 완화, 과도한 긴장 해소, 신경계 안정 목적의 부드러운 알파 대역 자극입니다.",
+      },
+      smr: {
+        title: "13.5Hz SMR Sensormotor Rhythm",
+        range: "12~15Hz",
+        mechanism: "운동감각 리듬 대역으로, 신체적 안정감을 동반한 집중 상태와 관련해 바이오피드백에서 자주 언급됩니다.",
+        effect: "공황성 긴장, 근육 경직, 신체화된 불안 반응을 가라앉히는 목적의 안정형 자극입니다.",
+      },
+      schumann: {
+        title: "7.83Hz 슈만 공명 Schumann",
+        range: "7.83Hz, 세타/알파 경계",
+        mechanism: "지구 전리층과 지표면 사이의 전자기 공명값으로 알려져 있으며, 명상 음원에서는 자연스러운 이완의 상징적 기준으로 사용됩니다.",
+        effect: "심리적 안정감, 깊은 이완, 안전하다는 느낌을 돕는 명상형 저속 변조 자극입니다.",
+      },
+      solfeggio396: {
+        title: "396Hz 솔페지오 Solfeggio",
+        range: "396Hz 캐리어 + 8Hz 부드러운 AM",
+        mechanism: "396Hz를 실제 들리는 캐리어로 사용하고, 8Hz 알파/세타 경계 변조를 얹은 명상 프리셋입니다.",
+        effect: "두려움과 죄책감 해소를 테마로 한 명상 배경음 스타일의 안정형 사운드입니다.",
+      },
+      natural432: {
+        title: "432Hz 자연 조화 Natural Tuning",
+        range: "432Hz 캐리어 + 8Hz 부드러운 AM",
+        mechanism: "A=432Hz 계열의 부드러운 캐리어를 사용하고, 8Hz 변조로 느린 이완감을 더한 프리셋입니다.",
+        effect: "청각적 피로감을 낮추고 차분한 배경음처럼 들리도록 만든 조화형 사운드입니다.",
+      },
+      healing528: {
+        title: "528Hz 치유 Healing",
+        range: "528Hz 캐리어 + 8Hz 부드러운 AM",
+        mechanism: "528Hz를 실제 들리는 캐리어로 사용하고, 8Hz 변조를 얹어 밝고 선명한 명상 톤으로 구성했습니다.",
+        effect: "깊은 내적 평화와 회복감을 테마로 한 명상형 프리셋입니다.",
       },
     };
 

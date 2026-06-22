@@ -3,8 +3,10 @@
 Generate 5-minute AM WAV files for browser playback.
 
 The generated files use a soft audible carrier and a sine-shaped amplitude
-envelope at the target stimulation frequency. The modulation depth stays below
-100% so the sound feels less buzzy while preserving the target rhythm.
+envelope at the target stimulation frequency. Brainwave targets change the
+modulation rate, while resonance presets change the audible carrier. The
+modulation depth stays below 100% so the sound feels less buzzy while
+preserving the target rhythm.
 """
 
 from __future__ import annotations
@@ -17,7 +19,8 @@ from pathlib import Path
 
 SAMPLE_RATE = 44_100
 DURATION_SECONDS = 5 * 60
-CARRIER_FREQ = 220.0
+DEFAULT_CARRIER_FREQ = 220.0
+DEFAULT_RESONANCE_MOD_FREQ = 8.0
 MODULATION_DEPTH = 0.45
 PEAK_AMPLITUDE = 0.50
 BITS_PER_SAMPLE = 16
@@ -27,17 +30,23 @@ CHUNK_SECONDS = 1
 OUTPUT_DIR = Path("wave")
 
 TARGETS = (
-    ("gamma_40hz_5m.wav", 40.0),
-    ("alpha_theta_8hz_5m.wav", 8.0),
-    ("delta_2hz_5m.wav", 2.0),
+    ("gamma_40hz_5m.wav", 40.0, DEFAULT_CARRIER_FREQ),
+    ("alpha_theta_8hz_5m.wav", 8.0, DEFAULT_CARRIER_FREQ),
+    ("delta_2hz_5m.wav", 2.0, DEFAULT_CARRIER_FREQ),
+    ("low_alpha_9_5hz_5m.wav", 9.5, DEFAULT_CARRIER_FREQ),
+    ("smr_13_5hz_5m.wav", 13.5, DEFAULT_CARRIER_FREQ),
+    ("schumann_7_83hz_5m.wav", 7.83, DEFAULT_CARRIER_FREQ),
+    ("solfeggio_396hz_5m.wav", DEFAULT_RESONANCE_MOD_FREQ, 396.0),
+    ("natural_432hz_5m.wav", DEFAULT_RESONANCE_MOD_FREQ, 432.0),
+    ("healing_528hz_5m.wav", DEFAULT_RESONANCE_MOD_FREQ, 528.0),
 )
 
 
-def generate_am_wav(path: Path, mod_freq: float) -> None:
+def generate_am_wav(path: Path, mod_freq: float, carrier_freq: float) -> None:
     """Generate a seamless-loop 16-bit mono PCM WAV file."""
     total_frames = SAMPLE_RATE * DURATION_SECONDS
     chunk_frames = SAMPLE_RATE * CHUNK_SECONDS
-    carrier_step = 2 * math.pi * CARRIER_FREQ / SAMPLE_RATE
+    carrier_step = 2 * math.pi * carrier_freq / SAMPLE_RATE
     mod_step = 2 * math.pi * mod_freq / SAMPLE_RATE
     carrier_phase = 0.0
     mod_phase = 0.0
@@ -76,10 +85,13 @@ def generate_am_wav(path: Path, mod_freq: float) -> None:
 def main() -> None:
     OUTPUT_DIR.mkdir(exist_ok=True)
 
-    for filename, mod_freq in TARGETS:
+    for filename, mod_freq, carrier_freq in TARGETS:
         path = OUTPUT_DIR / filename
-        print(f"Generating {path} ({mod_freq:g}Hz modulation)...")
-        generate_am_wav(path, mod_freq)
+        print(
+            f"Generating {path} "
+            f"({mod_freq:g}Hz modulation, {carrier_freq:g}Hz carrier)..."
+        )
+        generate_am_wav(path, mod_freq, carrier_freq)
 
     print("Done.")
 
